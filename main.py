@@ -7,7 +7,10 @@ import pytesseract
 import requests
 import re
 import datetime
+import sys
+import glob
 import serial
+from tkinter import messagebox, ttk
 from tkinter import *
 import tkinter as tk
 from PIL import Image, ImageTk
@@ -19,6 +22,10 @@ carplate_img = cv2.imread('./images/car_image.png')
 
 # Start video capture from default camera
 capture = cv2.VideoCapture(0)
+capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
+capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 650)
+
+
 # Import Haar Cascade XML file for Russian car plate numbers
 carplate_haar_cascade = cv2.CascadeClassifier('./haar_cascades/haarcascade_russian_plate_number.xml')
 registeredPlates = []
@@ -28,14 +35,39 @@ prevPlate = "000000"
 textToPut = ""
 textColor = (255, 0, 255)
 
+
+min_area = 500
+count = 0
+
 ser = serial.Serial("COM5", 9600)
 
-'''SELECT *, preg.allowed
-FROM plates_reports as prep
-LEFT JOIN plates_registered as preg 
-        ON prep.license LIKE CONCAT (preg.license, '%');'''
+def serial_ports():
+    """ Lists serial port names
 
+        :raises EnvironmentError:
+            On unsupported or unknown platforms
+        :returns:
+            A list of the serial ports available on the system
+    """
+    if sys.platform.startswith('win'):
+        ports = ['COM%s' % (i + 1) for i in range(256)]
+    elif sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
+        # this excludes your current terminal "/dev/tty"
+        ports = glob.glob('/dev/tty[A-Za-z]*')
+    elif sys.platform.startswith('darwin'):
+        ports = glob.glob('/dev/tty.*')
+    else:
+        raise EnvironmentError('Unsupported platform')
 
+    result = []
+    for port in ports:
+        try:
+            s = serial.Serial(port)
+            s.close()
+            result.append(port)
+        except (OSError, serial.SerialException):
+            pass
+    return result
 def request_plates():
     url = 'https://spktt.ru/plater/api.php?method=get.plates'
     headers = {'Authorization': 'No'}
@@ -55,6 +87,8 @@ def request_plates():
 
 
 def setBarrierState(state):
+    print(serial_ports())
+
     ser.write(bytearray(state, 'ascii'))
 
 
@@ -74,20 +108,25 @@ def report_detection(plate, isAllowed, isRegistered):
 
 request_plates()
 
-'''while capture.isOpened():
-
-    
-
-cv2.imshow('Frame', carplate_img)
-capture.release()
-cv2.destroyAllWindows()  # destroy all opened windows'''
-
 root = Tk()
 root.title('Car license plate detector')
 # root.geometry('640x520')
-root.minsize(646, 530)
+root.minsize(1080, 720)
 root.maxsize(1080, 720)
 root.configure(bg='#303030')
+
+mainmenu = Menu(root)
+settingsmenu = Menu(mainmenu, tearoff=0)
+
+settingsmenu2 = Menu(settingsmenu, tearoff=0)
+settingsmenu2.add_command(label="COM4")
+settingsmenu2.add_command(label="COM5")
+
+settingsmenu.add_cascade(label="COM-port", menu=settingsmenu2)
+
+root.config(menu=mainmenu)
+
+
 
 if (capture.isOpened() == False):
     print("Unable to read camera feed")
@@ -103,174 +142,123 @@ def exitWindow():
 
 f1 = LabelFrame(root, bg='red')
 f1.pack()
-l1 = Label(f1, bg='red')
-l1.pack()
+videoLabel = Label(f1, bg='black', width=1080, height=650)
+videoLabel.pack()
 
-l2 = Label(f1, bg='blue')
-l2.place(x=0, y=0)
+plateLabel = Label(root, bg='black', height=45, width=190)
 
-b1 = Button(root, fg='white', bg='green', activebackground='white', activeforeground='black', text='OPEN', relief=GROOVE,
-            height=50, width=20, command=lambda: setBarrierState('O'))
+plateLabel.pack(side=LEFT, padx=5, pady=5 )
+b1 = Button(root, fg='white', bg='#54b030', activebackground='white', activeforeground='black', text='OPEN ⬆️', relief=GROOVE,
+            height=50, width=30, command=lambda: setBarrierState('O'))
 b1.pack(side=LEFT, padx=5, pady=5)
 
-b2 = Button(root, fg='white', bg='red', activebackground='white', activeforeground='red', text='CLOSE', relief=GROOVE,
-            height=50, width=20, command=lambda: setBarrierState('C'))
+b2 = Button(root, fg='white', bg='#c41d23', activebackground='white', activeforeground='#c41d23', text='CLOSE ⬇️', relief=GROOVE,
+            height=50, width=30, command=lambda: setBarrierState('C'))
 b2.pack(side=LEFT, padx=5, pady=5)
 
-b3 = Button(root, bg='blue', fg='white', activebackground='white', activeforeground='blue', text='Update plates',
-            relief=GROOVE, height=50, width=20, command=request_plates)
-b3.pack(side=RIGHT, padx=5, pady=5)
+b3 = Button(root, bg='#3268a8', fg='white', activebackground='white', activeforeground='#3268a8', text='Update plates',
+            relief=GROOVE, height=50, width=30, command=request_plates)
+b3.pack(side=LEFT, padx=5, pady=5)
 
-b4 = Button(root, fg='white', bg='red', activebackground='white', activeforeground='red', text='EXIT ❌ ', relief=GROOVE,
-            height=50, width=20, command=exitWindow)
-b4.pack(side=BOTTOM, padx=5, pady=5)
+b4 = Button(root, fg='white', bg='#c41d23', activebackground='white', activeforeground='#c41d23', text='EXIT ❌', relief=GROOVE,
+            height=50, width=30, command=exitWindow)
+b4.pack(side=LEFT, padx=5, pady=5)
+
+
 
 while True:
+    n_plate_cnt = []
     if framesPassed > 5:
         framesPassed = 0
     else:
         framesPassed += 1
         continue
+    ret, frame = capture.read()
 
-    ret, carplate_img = capture.read()
 
     if not ret or ret is None:
         # carplate_img = cv2.imread('./images/car_image.png')
         print("failed to grab frame")
         continue
 
-    '''    
-    try:
-        ret, carplate_img = capture.read()
-
-    except ValueError:
-        print("Can't receive frame (stream end?). Exiting ...")
-        break
-    '''
-
-    # Read car image and convert color to RGB
-
-    carplate_img_rgb = cv2.cvtColor(carplate_img, cv2.COLOR_BGR2RGB)
-
-    carplate_rects = carplate_haar_cascade.detectMultiScale(carplate_img_rgb, scaleFactor=1.1, minNeighbors=5)
+    carplate_rects = carplate_haar_cascade.detectMultiScale(frame, scaleFactor=1.1, minNeighbors=5)
     # cv2.imshow('carplate_img_rgb', carplate_img)
     if len(carplate_rects) > 0:
-        # print("Plates count: ",len(carplate_rects))
+        plate_cascade = carplate_haar_cascade
+        img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Function to enlarge the plt display for user to view more clearly
-        def enlarge_plt_display(image, scale_factor):
-            width = int(image.shape[1] * scale_factor / 100)
-            height = int(image.shape[0] * scale_factor / 100)
-            dim = (width, height)
-            plt.figure(figsize=dim)
-            plt.axis('off')
-            plt.close()
-            # plt.imshow(image)
+        plates = plate_cascade.detectMultiScale(img_gray, 1.1, 4)
 
+        for (x, y, w, h) in plates:
+            area = w * h
 
-        enlarge_plt_display(carplate_img_rgb, 1.2)
+            if area > min_area:
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+                img_roi = frame[y: y + h, x:x + w]
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                blur = cv2.GaussianBlur(gray, (5, 5), 0)
+                edged = cv2.Canny(gray, 10, 200)
+                imagem = cv2.bitwise_not(gray)
+                adjusted = cv2.addWeighted(imagem, 3.0, imagem, 0, 0)
 
+                # find the contours, sort them, and keep only the 5 largest ones
+                contours, _ = cv2.findContours(edged, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
 
-        # Setup function to detect car plate
-        def carplate_detect(image):
-            carplate_overlay = image.copy()  # Create overlay to display red rectangle of detected car plate
-            carplate_rects = carplate_haar_cascade.detectMultiScale(carplate_overlay, scaleFactor=1.1, minNeighbors=5)
+                # loop over the contours
+                for c in contours:
+                    # approximate each contour
+                    peri = cv2.arcLength(c, True)
+                    approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+                    # if the contour has 4 points, we can say
+                    # that we have found our license plate
+                    if len(approx) == 4:
+                        n_plate_cnt = approx
+                        break
+                if len(n_plate_cnt) == 4:
+                    # get the bounding box of the contour and
+                    # extract the license plate from the image
+                    (x, y, w, h) = cv2.boundingRect(n_plate_cnt)
+                    license_plate = adjusted[y:y + h + 2, x:x + w + 2]
 
-            for x, y, w, h in carplate_rects:
-                cv2.rectangle(carplate_overlay, (x, y), (x + w, y + h), (255, 0, 0), 5)
+                    # Display the resulting image
+                    # cv2.imshow('carplate_extract_img_gray_blur', carplate_extract_img_gray_blur)
+                    # Display the text extracted from the car plate
+                    text = pytesseract.image_to_string(license_plate, config=f'--psm 8 --oem 3 -c tessedit_char_whitelist=ABCEHKMOPTYX0123456789')
+                    text = text.upper()
 
-            return carplate_overlay
+                    text = re.sub(r"[^ABCEHKMOPTYX0-9]+", '', text)
 
+                    if re.match("[ABCEHKMOPTYX][0-9]{3}[ABCEHKMOPTYX]{2}[0-9]{2,3}", text):
+                        difference = datetime.datetime.now() - detectionTime
+                        difference = difference.seconds
+                        if (difference > 5 and prevPlate[0:6] != text[0:6]):
+                            prevPlate = text[0:6]
+                            print(prevPlate)
+                            detectionTime = datetime.datetime.now()
+                            if text in registeredPlates or any(text in s for s in registeredPlates):
+                                print("REGISTERED PLATE IN ", text)
+                                textToPut = text + " - REGISTERED"
+                                report_detection(text, 1, 1)
+                                setBarrierState('O')
+                                textColor = (0, 255, 0)
+                                # cv2.rectangle(carplate_img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                            else:
+                                print(text, " - ATTENDANCE REPORTED ")
+                                report_detection(text, 0, 0)
+                                setBarrierState('C')
+                                textToPut = text + " - UNKNOWN"
+                                textColor = (255, 0, 0)
+                        cv2.putText(frame, textToPut, (x, y - 20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, textColor, 2)
+                    img2 = ImageTk.PhotoImage(Image.fromarray(license_plate))
+                    plateLabel['image'] = img2
 
-        detected_carplate_img = carplate_detect(carplate_img_rgb)
-        enlarge_plt_display(detected_carplate_img, 1.2)
-
-
-        # Function to retrieve only the car plate sub-image itself
-        def carplate_extract(image):
-
-            carplate_rects = carplate_haar_cascade.detectMultiScale(image, scaleFactor=1.1, minNeighbors=5)
-
-            for x, y, w, h in carplate_rects:
-                carplate_img = image[y + 15:y + h - 10, x + 15:x + w - 20]
-
-            return carplate_img
-
-
-        # Enlarge image for further image processing later on
-        def enlarge_img(image, scale_percent):
-            width = int(image.shape[1] * scale_percent / 100)
-            height = int(image.shape[0] * scale_percent / 100)
-            dim = (width, height)
-
-            if not ret or ret is None:
-                return image
-            else:
-                resized_image = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
-                return resized_image
-
-
-        # Display extracted car license plate image
-        carplate_extract_img = carplate_extract(carplate_img_rgb)
-        carplate_extract_img = enlarge_img(carplate_extract_img, 150)
-        # plt.imshow(carplate_extract_img);
-
-        # Convert image to grayscale
-        carplate_extract_img_gray = cv2.cvtColor(carplate_extract_img, cv2.COLOR_RGB2GRAY)
-        plt.axis('off')
-        # plt.imshow(carplate_extract_img_gray, cmap='gray');
-
-        # Apply median blur + grayscale
-        carplate_extract_img_gray_blur = cv2.medianBlur(carplate_extract_img_gray, 3)  # Kernel size 3
-        plt.axis('off')
-        # plt.imshow(carplate_extract_img_gray_blur, cmap='gray');
-
-        # Display the resulting image
-        # cv2.imshow('carplate_extract_img_gray_blur', carplate_extract_img_gray_blur)
-        # Display the text extracted from the car plate
-        text = pytesseract.image_to_string(carplate_extract_img_gray_blur,
-                                           config=f'--psm 8 --oem 3 -c tessedit_char_whitelist=ABCEHKMOPTYX0123456789')
-        text = text.upper()
-
-        text = re.sub(r"[^ABCEHKMOPTYX0-9]+", '', text)
-
-        # img_roi = img[y: y + h, x:x + w]
-        # cv2.imshow("ROI", edged)
-        # cv2.putText(img, text, (x, y - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 2)
-        # display the license plate and the output image
-
-        if re.match("[ABCEHKMOPTYX][0-9]{3}[ABCEHKMOPTYX]{2}[0-9]{2,3}", text):
-            difference = datetime.datetime.now() - detectionTime
-            difference = difference.seconds
-            if (difference > 5 and prevPlate[0:6] != text[0:6]):
-                prevPlate = text[0:6]
-                print(prevPlate)
-                detectionTime = datetime.datetime.now()
-                if text in registeredPlates or any(text in s for s in registeredPlates):
-                    print("REGISTERED PLATE IN ", text)
-                    textToPut = text + " - REGISTERED"
-                    report_detection(text, 1, 1)
-                    setBarrierState('O')
-                    textColor = (0, 255, 0)
-
-                    # cv2.rectangle(carplate_img, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                else:
-                    print(text, " - ATTENDANCE REPORTED ")
-                    report_detection(text, 0, 0)
-                    setBarrierState('C')
-                    textToPut = text + " - UNKNOWN"
-                    textColor = (255, 0, 0)
-
-            cv2.putText(carplate_img, textToPut, (20, 20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1,
-                        textColor, 2)
-        img2 = ImageTk.PhotoImage(Image.fromarray(carplate_extract_img_gray))
-        l2['image'] = img2
     if cv2.waitKey(10) & 0xFF == ord('q'):
         break
 
-    img = ImageTk.PhotoImage(Image.fromarray(carplate_img))
+    img = ImageTk.PhotoImage(Image.fromarray(frame))
 
-    l1['image'] = img
+    videoLabel['image'] = img
 
     root.update()
 
