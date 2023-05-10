@@ -9,6 +9,7 @@ import re
 import datetime
 import serial
 from tkinter import *
+import tkinter as tk
 from PIL import Image, ImageTk
 
 # Set tesseract path to where the tesseract exe file is located (Edit this path accordingly based on your own settings)
@@ -27,7 +28,7 @@ prevPlate = "000000"
 textToPut = ""
 textColor = (255, 0, 255)
 
-ser = serial.Serial("COM4", 9600)
+ser = serial.Serial("COM5", 9600)
 
 '''SELECT *, preg.allowed
 FROM plates_reports as prep
@@ -85,11 +86,12 @@ root = Tk()
 root.title('Car license plate detector')
 # root.geometry('640x520')
 root.minsize(646, 530)
-root.maxsize(646, 530)
-root.configure(bg='#58F')
+root.maxsize(1080, 720)
+root.configure(bg='#303030')
 
 if (capture.isOpened() == False):
     print("Unable to read camera feed")
+
 
 
 def exitWindow():
@@ -107,12 +109,21 @@ l1.pack()
 l2 = Label(f1, bg='blue')
 l2.place(x=0, y=0)
 
-b1 = Button(root, bg='green', fg='white', activebackground='white', activeforeground='green', text='Update plates',
-            relief=RIDGE, height=200, width=30, command=request_plates)
-b1.pack(side=LEFT, padx=60, pady=5)
-b2 = Button(root, fg='white', bg='red', activebackground='white', activeforeground='red', text='EXIT ❌ ', relief=RIDGE,
-            height=200, width=20, command=exitWindow)
-b2.pack(side=LEFT, padx=40, pady=5)
+b1 = Button(root, fg='white', bg='green', activebackground='white', activeforeground='black', text='OPEN', relief=GROOVE,
+            height=50, width=20, command=lambda: setBarrierState('O'))
+b1.pack(side=LEFT, padx=5, pady=5)
+
+b2 = Button(root, fg='white', bg='red', activebackground='white', activeforeground='red', text='CLOSE', relief=GROOVE,
+            height=50, width=20, command=lambda: setBarrierState('C'))
+b2.pack(side=LEFT, padx=5, pady=5)
+
+b3 = Button(root, bg='blue', fg='white', activebackground='white', activeforeground='blue', text='Update plates',
+            relief=GROOVE, height=50, width=20, command=request_plates)
+b3.pack(side=RIGHT, padx=5, pady=5)
+
+b4 = Button(root, fg='white', bg='red', activebackground='white', activeforeground='red', text='EXIT ❌ ', relief=GROOVE,
+            height=50, width=20, command=exitWindow)
+b4.pack(side=BOTTOM, padx=5, pady=5)
 
 while True:
     if framesPassed > 5:
@@ -124,7 +135,7 @@ while True:
     ret, carplate_img = capture.read()
 
     if not ret or ret is None:
-        #carplate_img = cv2.imread('./images/car_image.png')
+        # carplate_img = cv2.imread('./images/car_image.png')
         print("failed to grab frame")
         continue
 
