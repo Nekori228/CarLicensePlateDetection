@@ -27,7 +27,7 @@ prevPlate = "000000"
 textToPut = ""
 textColor = (255, 0, 255)
 
-ser = serial.Serial("COM5", 9600)
+ser = serial.Serial("COM4", 9600)
 
 '''SELECT *, preg.allowed
 FROM plates_reports as prep
@@ -191,8 +191,12 @@ while True:
             width = int(image.shape[1] * scale_percent / 100)
             height = int(image.shape[0] * scale_percent / 100)
             dim = (width, height)
-            resized_image = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
-            return resized_image
+
+            if not ret or ret is None:
+                return image
+            else:
+                resized_image = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
+                return resized_image
 
 
         # Display extracted car license plate image
@@ -224,7 +228,7 @@ while True:
         # cv2.putText(img, text, (x, y - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 2)
         # display the license plate and the output image
 
-        if re.match("[ABCEHKMOPTYX][0-9]{3}[ABCEHKMOPTYX]{2}[0-9]{2,3}", text) or re.match("[ABCEHKMOPTYX][0-9]{3}[ABCEHKMOPTYX]{2}", text):
+        if re.match("[ABCEHKMOPTYX][0-9]{3}[ABCEHKMOPTYX]{2}[0-9]{2,3}", text):
             difference = datetime.datetime.now() - detectionTime
             difference = difference.seconds
             if (difference > 5 and prevPlate[0:6] != text[0:6]):
