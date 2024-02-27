@@ -16,7 +16,7 @@ import tkinter as tk
 from PIL import Image, ImageTk
 
 # Set tesseract path to where the tesseract exe file is located (Edit this path accordingly based on your own settings)
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+pytesseract.pytesseract.tesseract_cmd = r'/opt/homebrew/bin/tesseract'
 
 carplate_img = cv2.imread('./images/car_image.png')
 
@@ -39,7 +39,13 @@ textColor = (255, 0, 255)
 min_area = 500
 count = 0
 
-ser = serial.Serial("COM5", 9600)
+try:
+    ser = serial.Serial("/dev/tty.usbserial-110", 9600)
+except serial.SerialException as e:
+    print("Failed to open serial port:", e)
+    # Здесь вы можете выполнить дополнительные действия в случае ошибки
+    # Например, уведомить пользователя о проблеме или записать лог ошибки
+
 
 def serial_ports():
     """ Lists serial port names
@@ -68,8 +74,10 @@ def serial_ports():
         except (OSError, serial.SerialException):
             pass
     return result
+
+
 def request_plates():
-    url = 'https://spktt.ru/plater/api.php?method=get.plates'
+    url = 'https://schedule-pro.ru/plater/api.php?method=get.plates'
     headers = {'Authorization': 'No'}
     payload = {'method': ''}
 
@@ -93,7 +101,7 @@ def setBarrierState(state):
 
 
 def report_detection(plate, isAllowed, isRegistered):
-    url = 'https://spktt.ru/plater/api.php?method=post.report'
+    url = 'https://schedule-pro.ru/plater/api.php?method=post.report'
     headers = {'Authorization': 'No'}
     payload = {'method': 'post.report', 'plate': plate, 'isAllowed': isAllowed, 'isRegistered': isRegistered}
 
@@ -127,10 +135,8 @@ settingsmenu.add_cascade(label="COM-port", menu=settingsmenu2)
 root.config(menu=mainmenu)
 
 
-
 if (capture.isOpened() == False):
     print("Unable to read camera feed")
-
 
 
 def exitWindow():
@@ -147,12 +153,14 @@ videoLabel.pack()
 
 plateLabel = Label(root, bg='black', height=45, width=190)
 
-plateLabel.pack(side=LEFT, padx=5, pady=5 )
-b1 = Button(root, fg='white', bg='#54b030', activebackground='white', activeforeground='black', text='OPEN ⬆️', relief=GROOVE,
+plateLabel.pack(side=LEFT, padx=5, pady=5)
+b1 = Button(root, fg='white', bg='#54b030', activebackground='white', activeforeground='black', text='OPEN ⬆️',
+            relief=GROOVE,
             height=50, width=30, command=lambda: setBarrierState('O'))
 b1.pack(side=LEFT, padx=5, pady=5)
 
-b2 = Button(root, fg='white', bg='#c41d23', activebackground='white', activeforeground='#c41d23', text='CLOSE ⬇️', relief=GROOVE,
+b2 = Button(root, fg='white', bg='#c41d23', activebackground='white', activeforeground='#c41d23', text='CLOSE ⬇️',
+            relief=GROOVE,
             height=50, width=30, command=lambda: setBarrierState('C'))
 b2.pack(side=LEFT, padx=5, pady=5)
 
@@ -160,11 +168,10 @@ b3 = Button(root, bg='#3268a8', fg='white', activebackground='white', activefore
             relief=GROOVE, height=50, width=30, command=request_plates)
 b3.pack(side=LEFT, padx=5, pady=5)
 
-b4 = Button(root, fg='white', bg='#c41d23', activebackground='white', activeforeground='#c41d23', text='EXIT ❌', relief=GROOVE,
+b4 = Button(root, fg='white', bg='#c41d23', activebackground='white', activeforeground='#c41d23', text='EXIT ❌',
+            relief=GROOVE,
             height=50, width=30, command=exitWindow)
 b4.pack(side=LEFT, padx=5, pady=5)
-
-
 
 while True:
     n_plate_cnt = []
@@ -174,7 +181,6 @@ while True:
         framesPassed += 1
         continue
     ret, frame = capture.read()
-
 
     if not ret or ret is None:
         # carplate_img = cv2.imread('./images/car_image.png')
@@ -199,7 +205,7 @@ while True:
                 blur = cv2.GaussianBlur(gray, (5, 5), 0)
                 edged = cv2.Canny(gray, 10, 200)
                 imagem = cv2.bitwise_not(gray)
-                adjusted = cv2.addWeighted(imagem, 3.0, imagem, 0, 0)
+                adjusted = imagem  # cv2.addWeighted(imagem, 3.0, imagem, 0, 0)
 
                 # find the contours, sort them, and keep only the 5 largest ones
                 contours, _ = cv2.findContours(edged, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -224,12 +230,13 @@ while True:
                     # Display the resulting image
                     # cv2.imshow('carplate_extract_img_gray_blur', carplate_extract_img_gray_blur)
                     # Display the text extracted from the car plate
-                    text = pytesseract.image_to_string(license_plate, config=f'--psm 8 --oem 3 -c tessedit_char_whitelist=ABCEHKMOPTYX0123456789')
+                    text = pytesseract.image_to_string(license_plate,
+                                                       config=f'--psm 8 --oem 3 -c tessedit_char_whitelist=ABCEHKMOPTYX0123456789')
                     text = text.upper()
 
                     text = re.sub(r"[^ABCEHKMOPTYX0-9]+", '', text)
-
-                    if re.match("[ABCEHKMOPTYX][0-9]{3}[ABCEHKMOPTYX]{2}[0-9]{2,3}", text):
+                    print(text)
+                    if re.match("[ABCEHKMOPTYX][0-9]{3}[ABCEHKMOPTYX]{2}", text):
                         difference = datetime.datetime.now() - detectionTime
                         difference = difference.seconds
                         if (difference > 5 and prevPlate[0:6] != text[0:6]):
