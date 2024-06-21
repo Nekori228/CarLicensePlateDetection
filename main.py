@@ -17,12 +17,14 @@ from PIL import Image, ImageTk
 from six import StringIO
 
 # Set tesseract path to where the tesseract exe file is located (Edit this path accordingly based on your own settings)
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+pytesseract.pytesseract.tesseract_cmd = r'/opt/homebrew/bin/tesseract'
 
 carplate_img = cv2.imread('./images/car_image.png')
 
+print(pytesseract.pytesseract.tesseract_cmd)
+
 # Start video capture from default camera
-capture = cv2.VideoCapture(1)
+capture = cv2.VideoCapture(0)
 capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
 capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 650)
 
@@ -44,7 +46,7 @@ token = 'Bearer 11|QEDXRHHZZoVB9XQB3hczsPnqRqm0MPO5VFrCN6BY'
 min_area = 500
 count = 0
 
-#ser = serial.Serial("COM4", 9600)
+ser = serial.Serial("/dev/tty.usbserial-110", 9600)
 
 
 def manualOpen():
@@ -77,6 +79,7 @@ def serial_ports():
         except (OSError, serial.SerialException):
             pass
     return result
+
 def request_plates():
     global domain, token
     url = domain+'api/cars/list'
@@ -102,15 +105,18 @@ def request_plates():
         print(error)
         # This code will run if there is a 404 error.
 
-
 def setBarrierState(state, plate, writeStatus):
     print(serial_ports())
+    if ser and ser.is_open:
+        try:
+            ser.write(bytearray(state, 'ascii'))
+        except serial.SerialException as e:
+            print(f"Error writing to serial port: {e}")
+    else:
+        print("Serial port is not available or not open.")
 
-    #ser.write(bytearray(state, 'ascii'))
     if state == 'O':
         report_detection(plate, 1, writeStatus)
-        #setBarrierState('O');
-
 
 def report_detection(plate, isAllowed, writeStatus):
     global domain, token
@@ -353,4 +359,4 @@ while True:
     root.update()
 
 capture.release()
-#ser.close()
+ser.close()
