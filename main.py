@@ -232,17 +232,14 @@ while True:
             area = w * h
 
             if area > min_area:
+
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
                 img_roi = frame[y: y + h, x:x + w]
-                #cv2.imshow("1 ROI", img_roi)
-                gray = cv2.cvtColor(img_roi, cv2.COLOR_BGR2GRAY)
-                #cv2.imshow("2 Gray", gray)
-                blur = cv2.GaussianBlur(gray, (5, 5), 0)
-                #cv2.imshow("3 Blur", blur)
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                #blur = cv2.GaussianBlur(gray, (5, 5), 0)
                 edged = cv2.Canny(gray, 10, 200)
-                #cv2.imshow("4 edged", edged)
-                #imagem = cv2.bitwise_not(edged)
-                #cv2.imshow("5 imagem", imagem)
+                imagem = cv2.bitwise_not(gray)
+                adjusted = imagem  # cv2.addWeighted(imagem, 3.0, imagem, 0, 0)
 
                 resize_test_license_plate = cv2.resize(
                     frame, None, fx=2, fy=2,
