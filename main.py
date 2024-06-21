@@ -39,11 +39,12 @@ textToPut = ""
 textColor = (255, 0, 255)
 
 manualAccessRequested = 0
-
+domain = "https://schedule-pro.ru/plater/public/"
+token = 'Bearer 11|QEDXRHHZZoVB9XQB3hczsPnqRqm0MPO5VFrCN6BY'
 min_area = 500
 count = 0
 
-ser = serial.Serial("COM4", 9600)
+#ser = serial.Serial("COM4", 9600)
 
 
 def manualOpen():
@@ -77,8 +78,9 @@ def serial_ports():
             pass
     return result
 def request_plates():
-    url = 'http://carplater/api/cars/list'
-    headers = {'Authorization': 'Bearer 10|vZhYVeQLQklSZXdcoo1HbJx6YD7zU6BAafjYW2o6'}
+    global domain, token
+    url = domain+'api/cars/list'
+    headers = {'Authorization': token}
     payload = {'method': ''}
 
     try:
@@ -104,13 +106,15 @@ def request_plates():
 def setBarrierState(state, plate, writeStatus):
     print(serial_ports())
 
-    ser.write(bytearray(state, 'ascii'))
+    #ser.write(bytearray(state, 'ascii'))
     if state == 'O':
         report_detection(plate, 1, writeStatus)
         #setBarrierState('O');
 
 
 def report_detection(plate, isAllowed, writeStatus):
+    global domain, token
+
     if writeStatus is True:
         print("image written")
         with open('./temp/0.jpg', 'rb') as f:
@@ -121,9 +125,8 @@ def report_detection(plate, isAllowed, writeStatus):
         print("problem")  # or raise exception, handle problem, etc.
         files = {'image': 0}
 
-
-    url = 'http://carplater/api/detects'
-    headers = {'Authorization': 'Bearer 10|vZhYVeQLQklSZXdcoo1HbJx6YD7zU6BAafjYW2o6'}
+    url = domain + 'api/detects'
+    headers = {'Authorization': token}
 
     payload = {'plate': plate, 'wasApproved': isAllowed}
 
@@ -237,20 +240,20 @@ while True:
                 blur = cv2.GaussianBlur(gray, (5, 5), 0)
                 #cv2.imshow("3 Blur", blur)
                 edged = cv2.Canny(gray, 10, 200)
-                cv2.imshow("4 edged", edged)
+                #cv2.imshow("4 edged", edged)
                 #imagem = cv2.bitwise_not(edged)
                 #cv2.imshow("5 imagem", imagem)
 
                 resize_test_license_plate = cv2.resize(
                     frame, None, fx=2, fy=2,
                     interpolation=cv2.INTER_CUBIC)
-                cv2.imshow("resize_test_license_plate", resize_test_license_plate)
+                #cv2.imshow("resize_test_license_plate", resize_test_license_plate)
                 grayscale_resize_test_license_plate = cv2.cvtColor(
                     resize_test_license_plate, cv2.COLOR_BGR2GRAY)
-                cv2.imshow("grayscale_resize_test_license_plate", grayscale_resize_test_license_plate)
+                #cv2.imshow("grayscale_resize_test_license_plate", grayscale_resize_test_license_plate)
                 gaussian_blur_license_plate = cv2.GaussianBlur(
                     grayscale_resize_test_license_plate, (5, 5), 0)
-                cv2.imshow("gaussian_blur_license_plate", gaussian_blur_license_plate)
+                #cv2.imshow("gaussian_blur_license_plate", gaussian_blur_license_plate)
 
 
                 adjusted = gray #cv2.addWeighted(imagem, 3.0, imagem, 0, 0)
@@ -277,9 +280,10 @@ while True:
 
                     # Display the resulting image
                     # cv2.imshow('carplate_extract_img_gray_blur', carplate_extract_img_gray_blur)
+                    cv2.imshow('Plate', license_plate)
                     # Display the text extracted from the car plate
-                    #text = pytesseract.image_to_string(license_plate, config=f'--psm 8 --oem 3 -c tessedit_char_whitelist=ABCEHKMOPTYX0123456789')
-                    text = pytesseract.image_to_string(license_plate, lang='eng', config='--oem 3 -l eng --psm 6 -c tessedit_char_whitelist=ABCEHKMOPTYX0123456789')
+                    text = pytesseract.image_to_string(license_plate, config=f'--psm 8 --oem 3 -c tessedit_char_whitelist=ABCEHKMOPTYX0123456789')
+                    #text = pytesseract.image_to_string(license_plate, lang='eng', config='--oem 3 -l eng --psm 6 -c tessedit_char_whitelist=ABCEHKMOPTYX0123456789')
                     text = text.upper()
 
                     text = re.sub(r"[^ABCEHKMOPTYX0-9]+", '', text)
@@ -352,4 +356,4 @@ while True:
     root.update()
 
 capture.release()
-ser.close()
+#ser.close()
